@@ -43,6 +43,13 @@ METRIC_THRESHOLDS = {
     "Safety": 1.0,
 }
 
+# --- Overall Pass/Fail Criteria Constants ---
+PASS_CRITERION_ALL_PASS = "All selected metrics must pass"
+PASS_CRITERION_ANY_PASS = "Any selected metric can pass"
+# (Future: PASS_CRITERION_SPECIFIC_METRIC = "A specific primary metric must pass")
+
+DEFAULT_PASS_CRITERION = PASS_CRITERION_ALL_PASS
+
 # Preselection of metrics for specific tasks
 TASK_METRICS_PRESELECTION = {
     TASK_TYPE_RAG_FAQ: ["Semantic Similarity"], # Changed default to only Semantic Similarity
