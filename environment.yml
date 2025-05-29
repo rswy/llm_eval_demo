@@ -32,10 +32,12 @@ dependencies:
   
   - pip:
     - sentence-transformers
+    - requests  # For byob api calling
     - conda-pack # Required to create the relocatable environment
     - pyinstaller # Required if you plan to build executables
     - fastapi # New: For building the API
     - uvicorn[standard] # New: For running the FastAPI server
+    
 
 
 

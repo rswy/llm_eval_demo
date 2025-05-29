@@ -19,15 +19,28 @@ TASK_TYPE_MAPPING = {
 # The actual metric classes are imported in evaluator.py
 AVAILABLE_METRICS = {
     "Semantic Similarity": "SemanticSimilarityMetric",
-    "Completeness": "CompletenessMetric",
-    "Conciseness": "ConcisenessMetric",
-    "Trust & Factuality": "TrustFactualityMetric",
-    "Safety": "SafetyMetric", # Added Safety Metric
+    "Fact Adherence": "FactAdherenceMetric",  # <-- ADDED
+    # "Trust & Factuality": "TrustFactualityMetric",
+    # "Completeness": "CompletenessMetric",
+    # "Conciseness": "ConcisenessMetric",
+    # "Safety": "SafetyMetric", # Added Safety Metric
     # "Fluency": "FluencyMetric", # Placeholder for future implementation
     # "Coherence": "CoherenceMetric", # Placeholder for future implementation
     # "Toxicity": "ToxicityMetric", # Placeholder for future implementation
     # "Bias": "BiasMetric", # Placeholder for future implementation
     # "Accuracy": "AccuracyMetric", # Placeholder for future implementation
+}
+
+
+# Default thresholds for each metric
+# These thresholds are used to determine pass/fail status for each metric
+METRIC_THRESHOLDS = {
+    "Semantic Similarity": 0.75,
+    "Completeness": 0.70,
+    "Conciseness": 0.80,
+    "Trust & Factuality": 0.75,
+    "Fact Adherence": 0.99, # e.g., require all facts to be present (score 1.0 for all found)
+    "Safety": 1.0,
 }
 
 # Preselection of metrics for specific tasks
@@ -38,15 +51,7 @@ TASK_METRICS_PRESELECTION = {
 }
 
 
-# Default thresholds for each metric
-# These thresholds are used to determine pass/fail status for each metric
-METRIC_THRESHOLDS = {
-    "Semantic Similarity": 0.75, # Cosine similarity score
-    "Completeness": 0.70,       # Percentage of reference covered
-    "Conciseness": 0.80,        # Ratio of concise words
-    "Trust & Factuality": 0.75, # Factual consistency score
-    "Safety": 1.0,              # 1.0 for safe, 0.0 for unsafe
-}
+
 
 # Required columns for the input CSV/JSON file
 # 'query': The user's input query
@@ -58,8 +63,9 @@ REQUIRED_COLUMNS = [
     'query',
     'llm_output',
     'reference_answer',
-    'test_description', # Added optional column
-    'test_config' # Changed from 'category'
+    'required_facts',     # <-- ADDED for fact-checking (optional)
+    'test_description',
+    'test_config'
 ]
 
 # Columns that are typically for internal reference or raw data,
@@ -81,12 +87,15 @@ SENTENCE_BERT_MODEL_PATH = os.path.join(MODEL_DIR, SENTENCE_BERT_MODEL)
 
 # Interpretation engine configuration
 # This could include rules or prompts for generating insights
+
 INTERPRETATION_CONFIG = {
-    "semantic_similarity_insight": "Semantic similarity measures how close the meaning of the LLM's output is to the reference answer. A higher score indicates better understanding and relevance.",
-    "completeness_insight": "Completeness assesses whether the LLM's output covers all essential information present in the reference answer. A higher score means more comprehensive answers.",
-    "conciseness_insight": "Conciseness evaluates if the LLM's output is brief and to the point without losing necessary information. A higher score indicates less verbosity.",
-    "trust_factuality_insight": "Trust and factuality checks if the LLM's output is consistent with factual information provided. A higher score means more reliable and accurate answers.",
-    "safety_insight": "Safety checks if the LLM's output contains any user-defined sensitive keywords. A score of 1.0 means no sensitive keywords were detected (safe), while 0.0 means sensitive content was found (unsafe).",
+    # ... (other metric insights)
+    "semantic_similarity_insight": "Semantic similarity measures how close the meaning of the LLM's output is to the reference answer. Higher score = better relevance.",
+    "fact_adherence_insight": "Fact Adherence checks if specific, predefined 'required facts' are present in the LLM's output. A score of 1.0 means all required facts were found. This is useful for ensuring critical pieces of information are always included.",
+    "completeness_insight": "Completeness assesses if the LLM's output covers essential information from the reference answer. Higher score = more comprehensive.",
+    "conciseness_insight": "Conciseness evaluates if the LLM's output is brief and to the point. Higher score = less verbosity.",
+    "trust_factuality_insight": "Trust & Factuality checks if the LLM's output is consistent with factual information in the reference. Higher score = more reliable.",
+    "safety_insight": "Safety checks for user-defined sensitive keywords. Score 1.0 = safe (no keywords detected), 0.0 = unsafe.",
 }
 
 # Report generation configuration
@@ -108,9 +117,10 @@ UI_CONFIG = {
 }
 
 # Feature Toggles for UI Sections (Developer controlled)
-# Set to True for developers (full control), False for end-users (simplified)
-DEVELOPER_MODE = True 
 
 # These flags now depend on DEVELOPER_MODE
-ENABLE_TASK_SELECTION = DEVELOPER_MODE # Set to False to hide Step 2
-ENABLE_METRIC_SELECTION = DEVELOPER_MODE # Set to False to hide Step 3
+ENABLE_TASK_SELECTION = False # Set to False to hide Step 2
+
+# Set to True for developers (full control), False for end-users (simplified)
+DEVELOPER_MODE = True
+ENABLE_METRIC_SELECTION = True # Set to False to hide Step 3

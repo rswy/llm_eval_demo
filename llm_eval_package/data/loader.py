@@ -88,8 +88,8 @@ class DataLoader:
             st.error(f"Missing required columns: {', '.join(missing_columns)}. "
                      f"Please ensure your file contains: {', '.join(mandatory_cols)}")
             st.stop() # Stop execution if columns are missing
-        
+
         # Check for optional columns and add them if missing, filling with empty strings
-        for col in REQUIRED_COLUMNS:
+        for col in REQUIRED_COLUMNS: # <-- This uses the global REQUIRED_COLUMNS
             if col not in df.columns:
                 df[col] = '' # Add missing optional columns with empty string
