@@ -66,13 +66,15 @@ TASK_METRICS_PRESELECTION = {
 # 'reference_answer': The human-written reference answer
 # 'test_description': (Optional) A description for the test case
 # 'test_config': (Optional) Configuration or category of the query for filtering/grouping
+
 REQUIRED_COLUMNS = [
     'query',
     'llm_output',
     'reference_answer',
-    'required_facts',     # <-- ADDED for fact-checking (optional)
-    'test_description',
-    'test_config'
+    'initial_reviewer_verdict', # << NEW: Optional, for pre-populating UAT result
+    'required_facts',     # Optional, for Fact Adherence metric
+    'test_description',   # Optional
+    'test_config',         # Optional
 ]
 
 # Columns that are typically for internal reference or raw data,

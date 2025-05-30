@@ -1,424 +1,399 @@
+# # llm_eval_package/ui/results_view.py
+# import streamlit as st
+# import pandas as pd
+# from llm_eval_package.config import METRIC_THRESHOLDS, INTERPRETATION_CONFIG
+
+# class ResultsView:
+#     def __init__(self):
+#         pass
+
+#     def render_results(self, df_evaluated_to_edit: pd.DataFrame, selected_metrics: list, 
+#                        custom_thresholds: dict = None, 
+#                        automated_overall_col_name: str = "Automated Overall Result",
+#                        reviewer_override_column: str = "Reviewer's Final Result"
+#                        ) -> pd.DataFrame: 
+#         if df_evaluated_to_edit.empty:
+#             st.warning("No evaluation results to display.")
+#             return df_evaluated_to_edit.copy()
+
+#         st.header("📊 Evaluation Results")
+#         current_thresholds = custom_thresholds if custom_thresholds is not None else METRIC_THRESHOLDS.copy()
+        
+#         df_display_and_edit = df_evaluated_to_edit.copy()
+
+#         # Ensure essential result columns exist
+#         if automated_overall_col_name not in df_display_and_edit.columns:
+#             df_display_and_edit[automated_overall_col_name] = pd.NA 
+        
+#         allowed_override_values = ['Pass', 'Fail', 'N/A', 'Error']
+#         if reviewer_override_column not in df_display_and_edit.columns:
+#             df_display_and_edit[reviewer_override_column] = df_display_and_edit[automated_overall_col_name].fillna('N/A')
+#         df_display_and_edit[reviewer_override_column] = df_display_and_edit[reviewer_override_column].apply(
+#             lambda x: str(x) if pd.notna(x) and str(x) in allowed_override_values else 'N/A'
+#         )
+
+#         summary_col_for_display = reviewer_override_column
+#         self._display_overall_summary(df_display_and_edit, 
+#                                       summary_pass_fail_col=summary_col_for_display, 
+#                                       evaluator_pass_fail_col=automated_overall_col_name)
+        
+#         self._display_metric_performance_and_insights(df_display_and_edit, selected_metrics, current_thresholds)
+
+#         edited_df_from_editor = self._display_detailed_results_editable( # Renamed method
+#             df_display_and_edit, selected_metrics, current_thresholds, 
+#             automated_overall_col_name=automated_overall_col_name,
+#             reviewer_override_column=reviewer_override_column
+#         )
+
+#         if 'test_config' in edited_df_from_editor.columns:
+#             valid_configs = edited_df_from_editor['test_config'].dropna().unique()
+#             if len(valid_configs) > 0 :
+#                 st.markdown("---"); st.subheader("📋 Summary by Test Configuration")
+#                 df_for_configs = edited_df_from_editor.copy()
+#                 df_for_configs['test_config_filled'] = df_for_configs['test_config'].fillna("Uncategorized")
+#                 unique_test_configs_display = sorted(df_for_configs['test_config_filled'].unique())
+#                 for config_name_display in unique_test_configs_display:
+#                     config_df_subset = df_for_configs[df_for_configs['test_config_filled'] == config_name_display]
+#                     if not config_df_subset.empty:
+#                         with st.expander(f"Results for: **{config_name_display}** ({len(config_df_subset)} test cases)"):
+#                             self._display_overall_summary(config_df_subset, 
+#                                                           summary_pass_fail_col=summary_col_for_display,
+#                                                           evaluator_pass_fail_col=automated_overall_col_name, 
+#                                                           is_group_summary=True)
+#         return edited_df_from_editor
+
+#     def _display_overall_summary(self, df_summary: pd.DataFrame, 
+#                                  summary_pass_fail_col: str, 
+#                                  evaluator_pass_fail_col: str, 
+#                                  is_group_summary: bool = False):
+#         # ... (This method remains the same as provided in the previous response) ...
+#         if not is_group_summary: st.subheader("Overall Summary")
+#         total_rows = len(df_summary)
+#         st.write(f"Total test cases in this group: **{total_rows}**")
+#         if total_rows > 0 and summary_pass_fail_col in df_summary.columns:
+#             valid_mask = df_summary[summary_pass_fail_col].isin(['Pass', 'Fail'])
+#             num_valid = valid_mask.sum()
+#             passed = (df_summary.loc[valid_mask, summary_pass_fail_col] == 'Pass').sum()
+#             failed = num_valid - passed
+#             other = total_rows - num_valid
+#             pass_rate = (passed / num_valid) * 100 if num_valid > 0 else 0.0
+#             summary_col_label = "Reviewer's Final" if summary_pass_fail_col == "Reviewer's Final Result" else "Automated"
+#             st.metric(label=f"**{summary_col_label} Test Case Pass Rate**", value=f"{pass_rate:.2f}%")
+#             st.caption(f"Passed: {passed}, Failed: {failed}, Other (Error/N/A): {other} out of {total_rows}")
+#             if summary_pass_fail_col == "Reviewer's Final Result" and evaluator_pass_fail_col in df_summary.columns and evaluator_pass_fail_col != summary_pass_fail_col:
+#                 eval_valid_mask = df_summary[evaluator_pass_fail_col].isin(['Pass', 'Fail'])
+#                 eval_num_valid = eval_valid_mask.sum()
+#                 eval_passed = (df_summary.loc[eval_valid_mask, evaluator_pass_fail_col] == 'Pass').sum()
+#                 eval_rate = (eval_passed / eval_num_valid) * 100 if eval_num_valid > 0 else 0.0
+#                 st.caption(f"(Automated Overall Pass Rate: {eval_rate:.2f}%)")
+#             st.markdown("---")
+#         elif total_rows > 0 : 
+#              st.caption(f"Note: Summary column '{summary_pass_fail_col}' not found or had no valid 'Pass'/'Fail' values.")
+#              st.markdown("---")
+
+#     def _display_metric_performance_and_insights(self, df_evaluated: pd.DataFrame, selected_metrics: list, current_thresholds: dict):
+#         # ... (This method remains the same - it uses the full df_evaluated which has all metric P/F and scores) ...
+#         st.subheader("💡 Metric Performance & Explanations")
+#         if not selected_metrics: st.caption("No metrics selected."); return
+#         st.markdown("##### Detailed Metric Breakdown (Across All Data):")
+#         cols_per_row = min(len(selected_metrics), 3)
+#         metric_cols_display = st.columns(cols_per_row)
+#         col_idx = 0
+#         for metric in selected_metrics:
+#             with metric_cols_display[col_idx % cols_per_row]:
+#                 st.markdown(f"**{metric}**")
+#                 pf_col = f'{metric} Pass/Fail' # This column exists in df_evaluated
+#                 if pf_col in df_evaluated.columns:
+#                     counts = df_evaluated[pf_col].value_counts()
+#                     pass_m, fail_m = counts.get('Pass', 0), counts.get('Fail', 0)
+#                     other_m = len(df_evaluated) - (pass_m + fail_m)
+#                     rate_m = (pass_m / (pass_m + fail_m)) * 100 if (pass_m + fail_m) > 0 else 0.0
+#                     st.markdown(f"Pass Rate: **{rate_m:.1f}%** (P:{pass_m}, F:{fail_m}, O:{other_m})")
+#                 score_col = f'{metric} Score' # This column also exists in df_evaluated
+#                 if score_col in df_evaluated.columns:
+#                     num_scores = pd.to_numeric(df_evaluated[score_col], errors='coerce').dropna()
+#                     avg_s = num_scores.mean() if not num_scores.empty else "N/A"
+#                     thresh = current_thresholds.get(metric, "N/A")
+#                     avg_s_display = f"{avg_s:.3f}" if isinstance(avg_s, float) else avg_s
+#                     thresh_display = f"{thresh:.2f}" if isinstance(thresh, float) else thresh
+#                     st.markdown(f"Avg Score: **{avg_s_display}** (Th: {thresh_display})")
+#                 insight_key = f"{metric.lower().replace(' ', '_').replace('&', '').strip()}_insight"
+#                 st.caption(INTERPRETATION_CONFIG.get(insight_key, "No insight available."))
+#                 if col_idx < len(selected_metrics) - 1 : st.markdown("---") 
+#             col_idx += 1
+#         st.markdown("---")
+
+
+#     def _display_detailed_results_editable(self, df_to_edit: pd.DataFrame, selected_metrics: list, 
+#                                            current_thresholds: dict, 
+#                                            automated_overall_col_name: str,
+#                                            reviewer_override_column: str
+#                                            ) -> pd.DataFrame:
+#         st.subheader("📝 Detailed Results (Review & Override)")
+#         st.caption(f"Individual metric scores are shown below. Edit '{reviewer_override_column}'. Edits will be automatically saved 💾.")
+
+#         df_for_editing_view = df_to_edit.copy()
+        
+#         # Define the order and selection of columns for the st.data_editor view
+#         key_info_cols = ['id', 'query', 'llm_output', 'reference_answer', 'test_description', 'test_config', 'required_facts']
+#         result_cols = [automated_overall_col_name, reviewer_override_column]
+        
+#         metric_score_cols_to_display = []
+#         for metric in selected_metrics:
+#             metric_score_cols_to_display.append(f'{metric} Score')
+#             # Individual Metric Pass/Fail columns are NOT displayed here as per user request
+
+#         # Construct the final order of columns for display in data_editor
+#         display_order_for_editor = [col for col in key_info_cols if col in df_for_editing_view.columns]
+#         display_order_for_editor.extend([col for col in result_cols if col in df_for_editing_view.columns])
+#         display_order_for_editor.extend([col for col in metric_score_cols_to_display if col in df_for_editing_view.columns])
+#         # Add any other columns that might have been in df_evaluated but not explicitly ordered (should be rare)
+#         display_order_for_editor.extend([col for col in df_for_editing_view.columns if col not in display_order_for_editor])
+        
+#         df_for_editor_view_subset = df_for_editing_view[display_order_for_editor].copy()
+
+
+#         column_config_dict = {
+#             reviewer_override_column: st.column_config.SelectboxColumn(
+#                 label=f"🧑‍⚖️ {reviewer_override_column}",
+#                 options=['Pass', 'Fail'], required=False, width="medium"
+#             ),
+#             automated_overall_col_name: st.column_config.TextColumn(label=f"🤖 {automated_overall_col_name}", width="medium"),
+#             "query": st.column_config.TextColumn(width="large"),
+#             "llm_output": st.column_config.TextColumn(width="large"),
+#             "reference_answer": st.column_config.TextColumn(width="large"),
+#             "id": st.column_config.TextColumn(width="small"),
+#             "test_config": st.column_config.TextColumn(width="small"),
+#             "required_facts": st.column_config.TextColumn(width="medium"),
+#             "test_description": st.column_config.TextColumn(width="medium"),
+#         }
+
+#         for metric in selected_metrics:
+#             score_col = f'{metric} Score'
+#             if score_col in df_for_editor_view_subset.columns: # Check if column exists in the subset
+#                  # Ensure scores are numeric for ProgressColumn; coerce errors to NaN
+#                  df_for_editor_view_subset[score_col] = pd.to_numeric(df_for_editor_view_subset[score_col], errors='coerce')
+#                  column_config_dict[score_col] = st.column_config.ProgressColumn(
+#                     label=score_col, format="%.3f", width="medium",
+#                     min_value=0.0, max_value=1.0,
+#                     help=f"Score (0-1). Threshold: {current_thresholds.get(metric, 'N/A'):.2f}"
+#                 )
+#             # MetricX Pass/Fail columns are intentionally omitted from column_config_dict
+        
+#         # All columns except reviewer_override_column should be disabled
+#         disabled_cols = [col for col in df_for_editor_view_subset.columns if col != reviewer_override_column]
+
+#         edited_df_subset = st.data_editor(
+#             df_for_editor_view_subset, # Pass the subset with correct column order
+#             column_config=column_config_dict,
+#             disabled=disabled_cols,
+#             use_container_width=True,
+#             key="detailed_results_editor_simplified", # New key for this version
+#             height=600,
+#             num_rows="fixed"
+#         )
+        
+#         # IMPORTANT: The `edited_df_subset` only contains the columns that were displayed.
+#         # We need to update the original full DataFrame (`df_to_edit`) with the changes 
+#         # from the `reviewer_override_column` if it was edited.
+#         # This ensures that columns not shown in the editor are preserved.
+#         if reviewer_override_column in edited_df_subset.columns:
+#             # Assuming row indices are preserved and aligned
+#             df_to_edit.loc[edited_df_subset.index, reviewer_override_column] = edited_df_subset[reviewer_override_column]
+            
+#         return df_to_edit # Return the original full DataFrame with the override column potentially updated
+
+
 # llm_eval_package/ui/results_view.py
 import streamlit as st
 import pandas as pd
-from llm_eval_package.config import METRIC_THRESHOLDS, INTERPRETATION_CONFIG, DEFAULT_HIDDEN_COLUMNS_IN_RESULTS
+from llm_eval_package.config import METRIC_THRESHOLDS, INTERPRETATION_CONFIG
 
 class ResultsView:
-    """
-    Manages the display of evaluation results in the Streamlit application.
-    """
-
     def __init__(self):
         pass
 
-    def _color_score_gradient(self, s, metric_name, current_thresholds):
-        # ... (existing code for coloring scores - no changes here)
-        if not pd.api.types.is_numeric_dtype(s):
-            return [''] * len(s) 
-
-        styles = []
-        threshold = current_thresholds.get(metric_name, 0.5) 
-
-        for v in s:
-            if pd.isna(v) or v == 'Error' or not isinstance(v, (int, float)): # Added check for non-numeric
-                styles.append('background-color: #f0f2f6; color: #4a4a4a;') 
-            elif metric_name == "Safety": 
-                if v == 1.0:
-                    styles.append('background-color: #d4edda; color: #155724;') 
-                else:
-                    styles.append('background-color: #f8d7da; color: #721c24;') 
-            else:
-                color_red = (255, 200, 200); color_yellow = (255, 255, 200); color_green = (200, 255, 200)
-                if v >= threshold:
-                    normalized_score = (v - threshold) / (1.0 - threshold) if (1.0 - threshold) > 0 else 0
-                    r = int(color_yellow[0] + normalized_score * (color_green[0] - color_yellow[0]))
-                    g = int(color_yellow[1] + normalized_score * (color_green[1] - color_yellow[1]))
-                    b = int(color_yellow[2] + normalized_score * (color_green[2] - color_yellow[2]))
-                    styles.append(f'background-color: rgb({r},{g},{b}); color: #1a1a1a;')
-                else:
-                    normalized_score = v / threshold if threshold > 0 else 0
-                    r = int(color_red[0] + normalized_score * (color_yellow[0] - color_red[0]))
-                    g = int(color_red[1] + normalized_score * (color_yellow[1] - color_red[1]))
-                    b = int(color_red[2] + normalized_score * (color_yellow[2] - color_red[2]))
-                    styles.append(f'background-color: rgb({r},{g},{b}); color: #1a1a1a;')
-        return styles
-
-
-    def _color_pass_fail(self, val):
-        # ... (existing code for coloring Pass/Fail - no changes here)
-        if val == 'Pass': return 'background-color: #d4edda; color: #155724;'
-        elif val == 'Fail': return 'background-color: #f8d7da; color: #721c24;'
-        elif val == 'Error': return 'background-color: #fff3cd; color: #856404;'
-        else: return ''
-
-
-    def render_results(self, df_evaluated: pd.DataFrame, selected_metrics: list, custom_thresholds: dict = None, overall_pass_fail_column: str = "Overall Pass/Fail"):
-        if df_evaluated.empty:
+    def render_results(self, df_evaluated_to_edit: pd.DataFrame, selected_metrics: list, 
+                       custom_thresholds: dict = None, 
+                       automated_overall_col_name: str = "Automated Overall Result",
+                       reviewer_override_column: str = "Reviewer's Final Result"
+                       ) -> pd.DataFrame: 
+        # ... (render_results logic from previous full response largely unchanged, calls _display_detailed_table_with_scores) ...
+        if df_evaluated_to_edit.empty:
             st.warning("No evaluation results to display.")
-            return
+            return df_evaluated_to_edit.copy()
 
         st.header("📊 Evaluation Results")
         current_thresholds = custom_thresholds if custom_thresholds is not None else METRIC_THRESHOLDS.copy()
-
-        # Display overall summary
-        self._display_summary(df_evaluated, selected_metrics, current_thresholds, "Overall Summary", overall_pass_fail_column=overall_pass_fail_column)
         
-        self._display_metric_insights(df_evaluated, selected_metrics)
+        df_display_and_edit = df_evaluated_to_edit.copy()
 
-        # Display detailed results table
-        self._display_detailed_table(df_evaluated, selected_metrics, current_thresholds, overall_pass_fail_column=overall_pass_fail_column)
+        if automated_overall_col_name not in df_display_and_edit.columns:
+            df_display_and_edit[automated_overall_col_name] = pd.NA 
+        
+        allowed_override_values = ['Pass', 'Fail', 'N/A', 'Error']
+        if reviewer_override_column not in df_display_and_edit.columns:
+            df_display_and_edit[reviewer_override_column] = df_display_and_edit[automated_overall_col_name].fillna('N/A')
+        df_display_and_edit[reviewer_override_column] = df_display_and_edit[reviewer_override_column].apply(
+            lambda x: str(x) if pd.notna(x) and str(x) in allowed_override_values else 'N/A'
+        )
 
-        # --- NEW: Summary by Test Configuration ---
-        if 'test_config' in df_evaluated.columns and df_evaluated['test_config'].nunique() > 1:
-            st.markdown("---")
-            st.subheader("📋 Summary by Test Configuration")
-            
-            unique_test_configs = df_evaluated['test_config'].unique()
-            # Sort unique_test_configs if they are not None or NaN, otherwise keep them as is
-            try:
-                sorted_configs = sorted([cfg for cfg in unique_test_configs if pd.notna(cfg)])
-                # Add back None or NaN if they existed
-                if any(pd.isna(cfg) for cfg in unique_test_configs):
-                    sorted_configs.append(None) # Or however you want to represent missing test_config
-            except TypeError: # Handles mixtures of types that can't be sorted
-                sorted_configs = unique_test_configs
+        summary_col_for_display = reviewer_override_column
+        self._display_overall_summary(df_display_and_edit, 
+                                      summary_pass_fail_col=summary_col_for_display, 
+                                      evaluator_pass_fail_col=automated_overall_col_name)
+        
+        self._display_metric_performance_and_insights(df_display_and_edit, selected_metrics, current_thresholds)
+
+        edited_df_from_editor = self._display_detailed_table_with_scores( 
+            df_display_and_edit, selected_metrics, current_thresholds, 
+            automated_overall_col_name=automated_overall_col_name,
+            reviewer_override_column=reviewer_override_column
+        )
+
+        if 'test_config' in edited_df_from_editor.columns:
+            valid_configs = edited_df_from_editor['test_config'].dropna().unique()
+            if len(valid_configs) > 0 :
+                st.markdown("---"); st.subheader("📋 Summary by Test Configuration")
+                df_for_configs = edited_df_from_editor.copy()
+                df_for_configs['test_config_filled'] = df_for_configs['test_config'].fillna("Uncategorized")
+                unique_test_configs_display = sorted(df_for_configs['test_config_filled'].unique())
+                for config_name_display in unique_test_configs_display:
+                    config_df_subset = df_for_configs[df_for_configs['test_config_filled'] == config_name_display]
+                    if not config_df_subset.empty:
+                        with st.expander(f"Results for: **{config_name_display}** ({len(config_df_subset)} test cases)"):
+                            self._display_overall_summary(config_df_subset, 
+                                                          summary_pass_fail_col=summary_col_for_display,
+                                                          evaluator_pass_fail_col=automated_overall_col_name, 
+                                                          is_group_summary=True)
+        return edited_df_from_editor
 
 
-            for config_name in sorted_configs:
-                config_df = df_evaluated[df_evaluated['test_config'] == config_name]
-                if pd.isna(config_name): # Handling for missing config names
-                    display_name = "Uncategorized Tests"
-                else:
-                    display_name = str(config_name)
-
-                with st.expander(f"Results for: **{display_name}** ({len(config_df)} test cases)"):
-                    if not config_df.empty:
-                        self._display_summary(config_df, selected_metrics, current_thresholds, title=None, overall_pass_fail_column=overall_pass_fail_column)
-                    else:
-                        st.caption("No data for this configuration.")
-        # --- END NEW SECTION ---
-
-    def _display_summary(self, df_summary: pd.DataFrame, selected_metrics: list, current_thresholds: dict, title: str = "Summary Report", overall_pass_fail_column: str = "Overall Pass/Fail"):
-        if title:
-            st.subheader(title)
-
+    def _display_overall_summary(self, df_summary: pd.DataFrame, 
+                                 summary_pass_fail_col: str, 
+                                 evaluator_pass_fail_col: str, 
+                                 is_group_summary: bool = False):
+        # ... (This method from previous response remains unchanged) ...
+        if not is_group_summary: st.subheader("Overall Summary")
         total_rows = len(df_summary)
         st.write(f"Total test cases in this group: **{total_rows}**")
-
-        # --- NEW: Overall Pass Rate based on the new combined column ---
-        if overall_pass_fail_column in df_summary.columns:
-            overall_passed = (df_summary[overall_pass_fail_column] == 'Pass').sum()
-            overall_failed = (df_summary[overall_pass_fail_column] == 'Fail').sum()
-            overall_error = (df_summary[overall_pass_fail_column] == 'Error').sum() # Assuming 'Error' is possible
-            overall_pass_rate = (overall_passed / total_rows) * 100 if total_rows > 0 else 0
-            
-            st.metric(label=f"**Overall Test Case Pass Rate**", value=f"{overall_pass_rate:.2f}%")
-            st.markdown(f"<small>Passed: {overall_passed}, Failed: {overall_failed}, Errors: {overall_error} (based on selected criterion)</small>", unsafe_allow_html=True)
+        if total_rows > 0 and summary_pass_fail_col in df_summary.columns:
+            valid_mask = df_summary[summary_pass_fail_col].isin(['Pass', 'Fail'])
+            num_valid = valid_mask.sum()
+            passed = (df_summary.loc[valid_mask, summary_pass_fail_col] == 'Pass').sum()
+            failed = num_valid - passed
+            other = total_rows - num_valid
+            pass_rate = (passed / num_valid) * 100 if num_valid > 0 else 0.0
+            summary_col_label = "Reviewer's Final" if summary_pass_fail_col == "Reviewer's Final Result" else "Automated"
+            st.metric(label=f"**{summary_col_label} Test Case Pass Rate**", value=f"{pass_rate:.2f}%")
+            st.caption(f"Passed: {passed}, Failed: {failed}, Other (Error/N/A): {other} out of {total_rows}")
+            if summary_pass_fail_col == "Reviewer's Final Result" and evaluator_pass_fail_col in df_summary.columns and evaluator_pass_fail_col != summary_pass_fail_col:
+                eval_valid_mask = df_summary[evaluator_pass_fail_col].isin(['Pass', 'Fail'])
+                eval_num_valid = eval_valid_mask.sum()
+                eval_passed = (df_summary.loc[eval_valid_mask, evaluator_pass_fail_col] == 'Pass').sum()
+                eval_rate = (eval_passed / eval_num_valid) * 100 if eval_num_valid > 0 else 0.0
+                st.caption(f"(Automated Overall Pass Rate: {eval_rate:.2f}%)")
             st.markdown("---")
-        # --- END NEW ---
+        elif total_rows > 0 : 
+             st.caption(f"Note: Summary column '{summary_pass_fail_col}' not found or had no valid 'Pass'/'Fail' values.")
+             st.markdown("---")
 
-        st.markdown("##### Metric-Specific Performance:")
-        
-        num_metrics = len(selected_metrics)
-        # Determine number of columns for metrics, max 3-4 per row for readability
-        cols_per_row = min(num_metrics, 3) 
-        
-        metric_summary_cols = st.columns(cols_per_row)
+
+    def _display_metric_performance_and_insights(self, df_evaluated: pd.DataFrame, selected_metrics: list, current_thresholds: dict):
+        # ... (This method from previous response remains unchanged) ...
+        st.subheader("💡 Metric Performance & Explanations")
+        if not selected_metrics: st.caption("No metrics selected."); return
+        st.markdown("##### Detailed Metric Breakdown (Across All Data):")
+        cols_per_row = min(len(selected_metrics), 3)
+        metric_cols_display = st.columns(cols_per_row)
         col_idx = 0
-
-        for i, metric in enumerate(selected_metrics):
-            current_col = metric_summary_cols[col_idx % cols_per_row]
-            with current_col:
-                if f'{metric} Pass/Fail' in df_summary.columns:
-                    pass_count = (df_summary[f'{metric} Pass/Fail'] == 'Pass').sum()
-                    fail_count = (df_summary[f'{metric} Pass/Fail'] == 'Fail').sum()
-                    error_count = (df_summary[f'{metric} Pass/Fail'] == 'Error').sum()
-                    pass_rate = (pass_count / total_rows) * 100 if total_rows > 0 else 0
-                    
-                    st.metric(label=f"{metric} Pass Rate", value=f"{pass_rate:.2f}%")
-                    st.caption(f"Pass: {pass_count}, Fail: {fail_count}, Error: {error_count}")
-                
-                if f'{metric} Score' in df_summary.columns:
-                    # Convert to numeric, coercing errors. This will turn 'Error' strings into NaN.
-                    numeric_scores = pd.to_numeric(df_summary[f'{metric} Score'], errors='coerce').dropna()
-                    if not numeric_scores.empty:
-                        avg_score = numeric_scores.mean()
-                        threshold_val = current_thresholds.get(metric, "N/A")
-                        threshold_display = f"{threshold_val:.2f}" if isinstance(threshold_val, (int,float)) else "N/A"
-                        st.caption(f"Avg Score: {avg_score:.3f} (Thresh: {threshold_display})")
-                    else:
-                        st.caption(f"Avg Score: N/A")
-                st.markdown("---") # Separator inside column after each metric block
-            col_idx +=1
-
-
-    def _display_detailed_table(self, df_evaluated: pd.DataFrame, selected_metrics: list, current_thresholds: dict, overall_pass_fail_column: str = "Overall Pass/Fail"):
-        st.subheader("Detailed Results Table")
-        
-        columns_to_display = [col for col in df_evaluated.columns if col not in DEFAULT_HIDDEN_COLUMNS_IN_RESULTS]
-        
-        # Ensure 'Overall Pass/Fail' is one of the first columns if it exists
-        if overall_pass_fail_column in columns_to_display:
-            columns_to_display.remove(overall_pass_fail_column)
-            # Try to insert after 'query', 'llm_output', 'reference_answer'
-            insert_pos = 0
-            core_cols = ['query', 'llm_output', 'reference_answer']
-            present_core_cols = [c for c in core_cols if c in columns_to_display]
-            if present_core_cols:
-                insert_pos = max(columns_to_display.index(c) for c in present_core_cols) + 1
-            columns_to_display.insert(insert_pos, overall_pass_fail_column)
-
-
-        styled_df = df_evaluated[columns_to_display].style
-
-        # Apply coloring
-        for metric_name in selected_metrics:
-            score_col = f'{metric_name} Score'
-            if score_col in columns_to_display:
-                styled_df = styled_df.apply(
-                    self._color_score_gradient,
-                    metric_name=metric_name,
-                    current_thresholds=current_thresholds,
-                    subset=[score_col]
-                )
-            
-            pass_fail_col = f'{metric_name} Pass/Fail'
-            if pass_fail_col in columns_to_display:
-                styled_df = styled_df.applymap(self._color_pass_fail, subset=[pass_fail_col])
-        
-        # Style the new 'Overall Pass/Fail' column
-        if overall_pass_fail_column in columns_to_display:
-             styled_df = styled_df.applymap(self._color_pass_fail, subset=[overall_pass_fail_column])
-
-        st.dataframe(styled_df, use_container_width=True, height=600) # Added height
-
-    def _display_metric_insights(self, df_evaluated: pd.DataFrame, selected_metrics: list):
-        # ... (existing code - no changes here for now, but could also be grouped by test_config if needed)
+        for metric in selected_metrics:
+            with metric_cols_display[col_idx % cols_per_row]:
+                st.markdown(f"**{metric}**")
+                pf_col = f'{metric} Pass/Fail' 
+                if pf_col in df_evaluated.columns:
+                    counts = df_evaluated[pf_col].value_counts()
+                    pass_m, fail_m = counts.get('Pass', 0), counts.get('Fail', 0)
+                    other_m = len(df_evaluated) - (pass_m + fail_m)
+                    rate_m = (pass_m / (pass_m + fail_m)) * 100 if (pass_m + fail_m) > 0 else 0.0
+                    st.markdown(f"Pass Rate: **{rate_m:.1f}%** (P:{pass_m}, F:{fail_m}, O:{other_m})")
+                score_col = f'{metric} Score' 
+                if score_col in df_evaluated.columns:
+                    num_scores = pd.to_numeric(df_evaluated[score_col], errors='coerce').dropna()
+                    avg_s = num_scores.mean() if not num_scores.empty else "N/A"
+                    thresh = current_thresholds.get(metric, "N/A")
+                    avg_s_display = f"{avg_s:.3f}" if isinstance(avg_s, float) else avg_s
+                    thresh_display = f"{thresh:.2f}" if isinstance(thresh, float) else thresh
+                    st.markdown(f"Avg Score: **{avg_s_display}** (Th: {thresh_display})")
+                insight_key = f"{metric.lower().replace(' ', '_').replace('&', '').strip()}_insight"
+                st.caption(INTERPRETATION_CONFIG.get(insight_key, "No insight available."))
+                if col_idx < len(selected_metrics) - 1 : st.markdown("---") 
+            col_idx += 1
         st.markdown("---")
-        st.subheader("💡 Metric Insights and Performance Summary")
+
+    def _display_detailed_table_with_scores(self, df_to_edit: pd.DataFrame, selected_metrics: list, 
+                                           current_thresholds: dict, 
+                                           automated_overall_col_name: str,
+                                           reviewer_override_column: str
+                                           ) -> pd.DataFrame:
+        st.subheader("📝 Detailed Results (Review & Override)")
+        st.caption(f"Individual metric scores are shown as progress bars. Edit '{reviewer_override_column}'. Changes are applied immediately (page will refresh).")
+
+        df_for_editing_view = df_to_edit.copy()
         
-        overall_pass_rates = {}
+        # Define column order for better UX when editing Reviewer's Final Result
+        key_info_cols = ['id', 'query'] # Start with essential identifiers
+        result_cols = [automated_overall_col_name, reviewer_override_column] # Put results early
+        context_cols = ['llm_output', 'reference_answer', 'required_facts'] # Context for review
+        metric_score_cols_to_display = [f'{metric} Score' for metric in selected_metrics] # Only scores
+        other_info_cols = ['test_description', 'test_config']
+        
+        # Construct the final order
+        display_order = []
+        for col_group in [key_info_cols, result_cols, context_cols, metric_score_cols_to_display, other_info_cols]:
+            display_order.extend([col for col in col_group if col in df_for_editing_view.columns and col not in display_order])
+        display_order.extend([col for col in df_for_editing_view.columns if col not in display_order]) # Add any remaining
+        
+        df_for_editor_view_subset = df_for_editing_view[display_order].copy()
+
+        column_config_dict = {
+            reviewer_override_column: st.column_config.SelectboxColumn(
+                label=f"🧑‍⚖️ {reviewer_override_column}",
+                options=['Pass', 'Fail', 'N/A', 'Error'], required=False, width="medium" # Medium width
+            ),
+            automated_overall_col_name: st.column_config.TextColumn(label=f"🤖 {automated_overall_col_name}", width="medium"),
+            "query": st.column_config.TextColumn(width="medium"), # Keep query accessible
+            "id": st.column_config.TextColumn(width="small"),
+            "llm_output": st.column_config.TextColumn(width="large"), # Make these large for readability
+            "reference_answer": st.column_config.TextColumn(width="large"),
+            "required_facts": st.column_config.TextColumn(width="medium"),
+        }
+
         for metric in selected_metrics:
-            pass_col = f'{metric} Pass/Fail'
-            if pass_col in df_evaluated.columns:
-                total_rows = len(df_evaluated)
-                pass_count = (df_evaluated[pass_col] == 'Pass').sum()
-                pass_rate = (pass_count / total_rows) * 100 if total_rows > 0 else 0
-                overall_pass_rates[metric] = pass_rate
-
-        if overall_pass_rates:
-            st.markdown("#### Overall Metric Performance (Across All Data):")
-            for metric, rate in overall_pass_rates.items():
-                if rate >= 80:
-                    st.success(f"**{metric}**: Excellent! Pass rate: **{rate:.2f}%**.")
-                elif rate >= 60:
-                    st.info(f"**{metric}**: Good. Pass rate: **{rate:.2f}%**.")
-                else:
-                    st.warning(f"**{metric}**: Review Needed. Pass rate: **{rate:.2f}%**.")
-            st.markdown("---")
-
-        for metric in selected_metrics:
-            insight_key = f"{metric.lower().replace(' ', '_').replace('&', '').strip()}_insight"
-            insight_text = INTERPRETATION_CONFIG.get(insight_key, f"No specific insight available for {metric}.")
-            st.markdown(f"**Understanding {metric}:** {insight_text}")
-
-# import streamlit as st
-# import pandas as pd
-# from llm_eval_package.config import METRIC_THRESHOLDS, INTERPRETATION_CONFIG, DEFAULT_HIDDEN_COLUMNS_IN_RESULTS # Updated import path
-
-# class ResultsView:
-#     """
-#     Manages the display of evaluation results in the Streamlit application.
-#     """
-
-#     def __init__(self):
-#         """
-#         Initializes the ResultsView.
-#         """
-#         pass
-
-#     def _color_score_gradient(self, s, metric_name, current_thresholds):
-#         """
-#         Applies a color gradient to score columns based on their value relative to a threshold.
-#         Green for good, red for bad. Ensures text visibility.
-#         """
-#         if not pd.api.types.is_numeric_dtype(s):
-#             return [''] * len(s) # Return empty styles for non-numeric columns
-
-#         styles = []
-#         threshold = current_thresholds.get(metric_name, 0.5) # Default threshold if not found
-
-#         for v in s:
-#             if pd.isna(v) or v == 'Error':
-#                 styles.append('background-color: #f0f2f6; color: #4a4a4a;') # Light grey, dark text
-#             elif metric_name == "Safety": # Safety is binary (1.0 for pass, 0.0 for fail)
-#                 if v == 1.0:
-#                     styles.append('background-color: #d4edda; color: #155724;') # Light green, dark green text
-#                 else:
-#                     styles.append('background-color: #f8d7da; color: #721c24;') # Light red, dark red text
-#             else:
-#                 # Use a color scale that ensures readability
-#                 # Interpolate between a light red, a neutral yellow, and a light green
-#                 # Values closer to 1.0 are greener, closer to 0.0 are redder.
-#                 # Adjusting based on threshold for better visual relevance
-                
-#                 # Define base colors (RGB tuples)
-#                 color_red = (255, 200, 200) # Light Red
-#                 color_yellow = (255, 255, 200) # Light Yellow
-#                 color_green = (200, 255, 200) # Light Green
-
-#                 if v >= threshold:
-#                     # Scale from threshold to 1.0 (green)
-#                     # Interpolate between yellow and green
-#                     normalized_score = (v - threshold) / (1.0 - threshold) if (1.0 - threshold) > 0 else 0
-#                     r = int(color_yellow[0] + normalized_score * (color_green[0] - color_yellow[0]))
-#                     g = int(color_yellow[1] + normalized_score * (color_green[1] - color_yellow[1]))
-#                     b = int(color_yellow[2] + normalized_score * (color_green[2] - color_yellow[2]))
-#                     styles.append(f'background-color: rgb({r},{g},{b}); color: #1a1a1a;') # Dark text
-#                 else:
-#                     # Scale from 0.0 to threshold (red)
-#                     # Interpolate between red and yellow
-#                     normalized_score = v / threshold if threshold > 0 else 0
-#                     r = int(color_red[0] + normalized_score * (color_yellow[0] - color_red[0]))
-#                     g = int(color_red[1] + normalized_score * (color_yellow[1] - color_red[1]))
-#                     b = int(color_red[2] + normalized_score * (color_yellow[2] - color_red[2]))
-#                     styles.append(f'background-color: rgb({r},{g},{b}); color: #1a1a1a;') # Dark text
-#         return styles
-
-#     def _color_pass_fail(self, val):
-#         """Applies color to Pass/Fail column."""
-#         if val == 'Pass':
-#             return 'background-color: #d4edda; color: #155724;' # Light green, dark green text
-#         elif val == 'Fail':
-#             return 'background-color: #f8d7da; color: #721c24;' # Light red, dark red text
-#         elif val == 'Error':
-#             return 'background-color: #fff3cd; color: #856404;' # Light yellow/orange, dark yellow text
-#         else:
-#             return ''
-
-#     def render_results(self, df_evaluated: pd.DataFrame, selected_metrics: list, custom_thresholds: dict = None):
-#         """
-#         Renders the evaluation results, including a summary and detailed table.
-
-#         Args:
-#             df_evaluated (pd.DataFrame): The DataFrame containing the evaluation results.
-#             selected_metrics (list): A list of metric names that were evaluated.
-#             custom_thresholds (dict, optional): A dictionary of custom thresholds used.
-#                                                 If None, default thresholds are used.
-#         """
-#         if df_evaluated.empty:
-#             st.warning("No evaluation results to display.")
-#             return
-
-#         st.header("📊 Evaluation Results")
-
-#         # Determine which thresholds to use for display
-#         current_thresholds = custom_thresholds if custom_thresholds is not None else METRIC_THRESHOLDS
-
-#         # Display overall summary
-#         self._display_summary(df_evaluated, selected_metrics, current_thresholds)
+            score_col = f'{metric} Score'
+            if score_col in df_for_editor_view_subset.columns:
+                 df_for_editor_view_subset[score_col] = pd.to_numeric(df_for_editor_view_subset[score_col], errors='coerce')
+                 column_config_dict[score_col] = st.column_config.ProgressColumn(
+                    label=score_col, format="%.3f", width="medium",
+                    min_value=0.0, max_value=1.0,
+                    help=f"Score (0-1). Threshold: {current_thresholds.get(metric, 'N/A'):.2f}"
+                )
         
-#         # Display metric insights (moved above detailed table)
-#         self._display_metric_insights(df_evaluated, selected_metrics) # Pass df_evaluated for potential dynamic insights
+        disabled_cols = [col for col in df_for_editor_view_subset.columns if col != reviewer_override_column]
 
-#         # Display detailed results table
-#         self._display_detailed_table(df_evaluated, selected_metrics, current_thresholds)
-
-
-#     def _display_summary(self, df_evaluated: pd.DataFrame, selected_metrics: list, current_thresholds: dict):
-#         """
-#         Displays a summary of the evaluation results, including pass/fail rates and average scores.
-#         """
-#         st.subheader("Summary Report")
-
-#         total_rows = len(df_evaluated)
-#         st.write(f"Total test cases evaluated: **{total_rows}**")
-
-#         summary_cols = st.columns(len(selected_metrics))
-#         for i, metric in enumerate(selected_metrics):
-#             if f'{metric} Pass/Fail' in df_evaluated.columns:
-#                 pass_count = (df_evaluated[f'{metric} Pass/Fail'] == 'Pass').sum()
-#                 fail_count = (df_evaluated[f'{metric} Pass/Fail'] == 'Fail').sum()
-#                 error_count = (df_evaluated[f'{metric} Pass/Fail'] == 'Error').sum()
-                
-#                 pass_rate = (pass_count / total_rows) * 100 if total_rows > 0 else 0
-
-#                 with summary_cols[i]:
-#                     st.metric(label=f"{metric} Pass Rate", value=f"{pass_rate:.2f}%")
-#                     st.markdown(f"<small>Pass: {pass_count}, Fail: {fail_count}, Error: {error_count}</small>", unsafe_allow_html=True)
+        edited_df_subset = st.data_editor(
+            df_for_editor_view_subset,
+            column_config=column_config_dict,
+            disabled=disabled_cols,
+            use_container_width=True,
+            key="detailed_results_editor_scores_override", # Changed key for this specific editor
+            height=600,
+            num_rows="fixed"
+        )
+        
+        # Update the original full DataFrame (`df_to_edit`) with changes from `reviewer_override_column`
+        if reviewer_override_column in edited_df_subset.columns:
+            # Ensure indices are aligned for the update. data_editor preserves original index.
+            df_to_edit.loc[edited_df_subset.index, reviewer_override_column] = edited_df_subset[reviewer_override_column]
             
-#             if f'{metric} Score' in df_evaluated.columns:
-#                 numeric_scores = pd.to_numeric(df_evaluated[f'{metric} Score'], errors='coerce').dropna()
-#                 if not numeric_scores.empty:
-#                     avg_score = numeric_scores.mean()
-#                     threshold = current_thresholds.get(metric)
-#                     st.markdown(f"<small>Avg Score: {avg_score:.3f} (Threshold: {threshold:.2f})</small>", unsafe_allow_html=True)
-#                 else:
-#                     st.markdown(f"<small>Avg Score: N/A</small>", unsafe_allow_html=True)
-
-
-#     def _display_detailed_table(self, df_evaluated: pd.DataFrame, selected_metrics: list, current_thresholds: dict):
-#         """
-#         Displays the detailed evaluation results table with styling.
-#         Filters out default hidden columns.
-#         """
-#         st.subheader("Detailed Results")
-        
-#         # Identify columns to display
-#         columns_to_display = [col for col in df_evaluated.columns if col not in DEFAULT_HIDDEN_COLUMNS_IN_RESULTS]
-        
-#         # Create a Styler object from the filtered DataFrame
-#         styled_df = df_evaluated[columns_to_display].style
-
-#         # Apply color gradient to score columns
-#         for metric_name in selected_metrics:
-#             score_col = f'{metric_name} Score'
-#             if score_col in columns_to_display: # Check if the score column is in the displayed columns
-#                 styled_df = styled_df.apply(
-#                     self._color_score_gradient,
-#                     metric_name=metric_name,
-#                     current_thresholds=current_thresholds,
-#                     subset=[score_col]
-#                 )
-            
-#             # Apply color to Pass/Fail columns
-#             pass_fail_col = f'{metric_name} Pass/Fail'
-#             if pass_fail_col in columns_to_display: # Check if the pass/fail column is in the displayed columns
-#                 styled_df = styled_df.applymap(self._color_pass_fail, subset=[pass_fail_col])
-
-#         # Display the styled DataFrame
-#         st.dataframe(styled_df, use_container_width=True)
-
-#     def _display_metric_insights(self, df_evaluated: pd.DataFrame, selected_metrics: list):
-#         """
-#         Displays insights for each selected metric and an overall performance summary.
-#         """
-#         st.subheader("💡 Metric Insights and Performance Summary")
-        
-#         # Overall Performance Summary
-#         overall_pass_rates = {}
-#         for metric in selected_metrics:
-#             pass_col = f'{metric} Pass/Fail'
-#             if pass_col in df_evaluated.columns:
-#                 total_rows = len(df_evaluated)
-#                 pass_count = (df_evaluated[pass_col] == 'Pass').sum()
-#                 pass_rate = (pass_count / total_rows) * 100 if total_rows > 0 else 0
-#                 overall_pass_rates[metric] = pass_rate
-
-#         if overall_pass_rates:
-#             st.markdown("#### Overall Performance at a Glance:")
-#             for metric, rate in overall_pass_rates.items():
-#                 if rate >= 80:
-#                     st.success(f"**{metric}**: Excellent performance! Achieved a pass rate of **{rate:.2f}%**.")
-#                 elif rate >= 60:
-#                     st.info(f"**{metric}**: Good performance. Achieved a pass rate of **{rate:.2f}%**.")
-#                 else:
-#                     st.warning(f"**{metric}**: Review needed. Pass rate of **{rate:.2f}%** indicates potential issues.")
-#             st.markdown("---")
-
-#         # Individual Metric Insights
-#         for metric in selected_metrics:
-#             insight_key = f"{metric.lower().replace(' ', '_').replace('&', '').strip()}_insight"
-#             insight_text = INTERPRETATION_CONFIG.get(insight_key, f"No specific insight available for {metric}.")
-#             st.markdown(f"**{metric}:** {insight_text}")
-
+        return df_to_edit
