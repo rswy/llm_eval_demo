@@ -231,7 +231,7 @@ class ResultsView:
         if automated_overall_col_name not in df_display_and_edit.columns:
             df_display_and_edit[automated_overall_col_name] = pd.NA 
         
-        allowed_override_values = ['Pass', 'Fail', 'N/A', 'Error']
+        allowed_override_values = ['Pass', 'Fail']#, 'N/A', 'Error'
         if reviewer_override_column not in df_display_and_edit.columns:
             df_display_and_edit[reviewer_override_column] = df_display_and_edit[automated_overall_col_name].fillna('N/A')
         df_display_and_edit[reviewer_override_column] = df_display_and_edit[reviewer_override_column].apply(

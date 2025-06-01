@@ -15,45 +15,74 @@ class DataLoader:
         """
         pass
 
+ 
+    def _load_csv(self, file_uploader) -> pd.DataFrame:
+        """
+        Loads data from a CSV file, ensuring 'id' is string.
+        """
+        # Define dtypes for specific columns, especially 'id'
+        # You can add other columns here if they need specific type handling
+        dtype_map = {'id': str} 
+        try:
+            # Try reading with specified dtypes
+            df = pd.read_csv(file_uploader, dtype=dtype_map)
+        except Exception:
+            # Fallback if dtype specification causes issues (e.g., id column not present)
+            # Reset file_uploader's cursor to read again
+            if hasattr(file_uploader, 'seek'):
+                file_uploader.seek(0)
+            df = pd.read_csv(file_uploader)
+            # If 'id' column exists after fallback, try to convert it to string
+            if 'id' in df.columns:
+                df['id'] = df['id'].astype(str)
+        return df
+
     def load_data(self, file_uploader) -> pd.DataFrame:
-        """
-        Loads data from an uploaded file (CSV or JSON) and performs validation.
-
-        Args:
-            file_uploader: The Streamlit file uploader object.
-
-        Returns:
-            pd.DataFrame: A pandas DataFrame containing the loaded data.
-
-        Raises:
-            ValueError: If the file format is unsupported or required columns are missing.
-        """
         if file_uploader is not None:
             file_extension = file_uploader.name.split('.')[-1].lower()
+            df = pd.DataFrame() # Initialize df
 
             if file_extension == 'csv':
                 df = self._load_csv(file_uploader)
             elif file_extension == 'json':
-                df = self._load_json(file_uploader)
+                # For JSON, type conversion might need to happen after loading into DataFrame
+                json_data = file_uploader.read().decode('utf-8')
+                data = json.loads(json_data)
+                df = pd.DataFrame(data)
+                if 'id' in df.columns:
+                    df['id'] = df['id'].astype(str) # Ensure 'id' is string for JSON too
             else:
                 st.error("Unsupported file format. Please upload a CSV or JSON file.")
-                st.stop() # Stop execution if format is unsupported
+                st.stop()
 
-            self._validate_columns(df)
+            self._validate_columns(df) # Ensure this method exists and is appropriate
             return df
-        return pd.DataFrame() # Return empty DataFrame if no file is uploaded
+        return pd.DataFrame()
 
-    def _load_csv(self, file_uploader) -> pd.DataFrame:
-        """
-        Loads data from a CSV file.
+    def _validate_columns(self, df: pd.DataFrame):
+        mandatory_cols = ['query', 'llm_output', 'reference_answer'] # Adjust as per your true mandatory cols
+        # Check for the truly mandatory columns for evaluation
+        # initial_reviewer_verdict is optional in input, created by app if not present
 
-        Args:
-            file_uploader: The Streamlit file uploader object for the CSV file.
+        # Add all columns defined in REQUIRED_COLUMNS from config if they are missing
+        # This includes 'id', 'initial_reviewer_verdict', etc., ensuring they exist
+        for col in REQUIRED_COLUMNS: # From config.py
+            if col not in df.columns:
+                df[col] = pd.NA # Or appropriate default like "" or None
+            # Ensure 'id' column is string if it was just added or to be safe
+            if col == 'id':
+                df[col] = df[col].astype(str).fillna("") # Ensure string and handle NaNs if any
 
-        Returns:
-            pd.DataFrame: A pandas DataFrame containing the CSV data.
-        """
-        return pd.read_csv(file_uploader)
+        # Now check for core mandatory fields needed for any processing to begin
+        # This check is more about preventing crashes than strict data validation for every possible column
+        # For example, 'query' is essential for fetching responses or evaluation.
+        essential_cols_for_processing = ['query'] # Adjust based on minimum needed to proceed
+        missing_essential_columns = [col for col in essential_cols_for_processing if col not in df.columns or df[col].isnull().all()]
+
+        if missing_essential_columns:
+            st.error(f"Missing essential data in column(s): {', '.join(missing_essential_columns)}. "
+                     f"Please ensure your file contains data for these.")
+            st.stop() 
 
     def _load_json(self, file_uploader) -> pd.DataFrame:
         """
@@ -70,26 +99,3 @@ class DataLoader:
         # Parse the JSON string into a Python object
         data = json.loads(json_data)
         return pd.DataFrame(data)
-
-    def _validate_columns(self, df: pd.DataFrame):
-        """
-        Validates if the DataFrame contains all required columns.
-
-        Args:
-            df (pd.DataFrame): The DataFrame to validate.
-
-        Raises:
-            ValueError: If any required column is missing.
-        """
-        # Only check for the truly mandatory columns for evaluation
-        mandatory_cols = ['query', 'llm_output', 'reference_answer']
-        missing_columns = [col for col in mandatory_cols if col not in df.columns]
-        if missing_columns:
-            st.error(f"Missing required columns: {', '.join(missing_columns)}. "
-                     f"Please ensure your file contains: {', '.join(mandatory_cols)}")
-            st.stop() # Stop execution if columns are missing
-
-        # Check for optional columns and add them if missing, filling with empty strings
-        for col in REQUIRED_COLUMNS: # <-- This uses the global REQUIRED_COLUMNS
-            if col not in df.columns:
-                df[col] = '' # Add missing optional columns with empty string
