@@ -1,30 +1,41 @@
 # llm_eval_package/metrics/fact_adherence.py
 from llm_eval_package.metrics.base import BaseMetric
-import numpy as np # For np.nan
+import numpy as np
 import warnings
-import pandas as pd # For pd.isna
+import pandas as pd
+import string # For punctuation
 
 try:
     import nltk
     from nltk.stem import WordNetLemmatizer
     from nltk.tokenize import word_tokenize
+    from nltk.corpus import wordnet # For POS tag mapping
+
     _NLTK_AVAILABLE = True
-    try: # Check for necessary NLTK data
+    # Check for necessary NLTK data and offer to download if missing
+    # This is a simplified check; a more robust check might try nltk.download()
+    # within a try-except block if permissions allow, or guide the user.
+    try:
         nltk.data.find('tokenizers/punkt')
         nltk.data.find('corpora/wordnet')
         nltk.data.find('corpora/omw-1.4')
-    except LookupError: # More specific exception for missing data
+        nltk.data.find('taggers/averaged_perceptron_tagger') # For nltk.pos_tag
+    except LookupError:
         warnings.warn(
-            "NLTK data (punkt, wordnet, omw-1.4) not found or NLTK itself is not fully configured. "
-            "Fact Adherence will fall back to simple substring matching. "
-            "To enable advanced matching, run in Python: \n"
-            "import nltk\nnltk.download('punkt')\nnltk.download('wordnet')\nnltk.download('omw-1.4')"
+            "One or more NLTK data packages (punkt, wordnet, omw-1.4, averaged_perceptron_tagger) "
+            "not found. Fact Adherence may fall back to simpler matching or be less accurate.\n"
+            "Please run the following in a Python interpreter:\n"
+            "import nltk\n"
+            "nltk.download('punkt')\n"
+            "nltk.download('wordnet')\n"
+            "nltk.download('omw-1.4')\n"
+            "nltk.download('averaged_perceptron_tagger')"
         )
-        _NLTK_AVAILABLE = False # Treat as unavailable if data is missing
+        _NLTK_AVAILABLE = False # If essential data is missing, treat NLTK as not fully ready
+
 except ImportError:
     _NLTK_AVAILABLE = False
-    warnings.warn("NLTK library not found. FactAdherenceMetric will fall back to simple substring matching.")
-
+    warnings.warn("NLTK library not found. FactAdherenceMetric will use simple substring matching.")
 
 class FactAdherenceMetric(BaseMetric):
     def __init__(self):
@@ -33,248 +44,112 @@ class FactAdherenceMetric(BaseMetric):
         if _NLTK_AVAILABLE:
             try:
                 self.lemmatizer = WordNetLemmatizer()
-                word_tokenize("test") # Test if punkt is available and working
-                self.lemmatizer.lemmatize("test") # Test if wordnet is available
+                word_tokenize("test") 
+                nltk.pos_tag(word_tokenize("test")) 
+                self.lemmatizer.lemmatize("tests", pos=wordnet.VERB) 
                 self.nltk_ready = True
-                print("DEBUG: NLTK Lemmatization is READY for Fact Adherence.")
+                print("DEBUG (FactAdherence): NLTK with POS-aware lemmatization is READY.")
             except Exception as e:
-                warnings.warn(f"NLTK components (punkt/wordnet) for FactAdherenceMetric failed to initialize: {e}. Falling back to simple substring matching.")
+                warnings.warn(f"FactAdherenceMetric: NLTK components failed ({e}). Falling back.")
+                self.nltk_ready = False
         else:
-             print("DEBUG: NLTK Lemmatization is NOT READY for Fact Adherence, falling back.")
+            print("DEBUG (FactAdherence): NLTK not available, falling back.")
 
+    def _get_wordnet_pos(self, nltk_tag):
+        if nltk_tag.startswith('J'): return wordnet.ADJ
+        elif nltk_tag.startswith('V'): return wordnet.VERB
+        elif nltk_tag.startswith('N'): return wordnet.NOUN
+        elif nltk_tag.startswith('R'): return wordnet.ADV
+        else: return wordnet.NOUN 
 
-    def _lemmatize_text(self, text):
+    def _process_text_for_matching(self, text: str):
+        """Tokenizes, cleans (keeps alphanumeric, specific symbols like $), and lemmatizes text."""
         if not self.nltk_ready or not text or not isinstance(text, str):
-             # Fallback for non-string, empty text, or if NLTK not ready
-            return str(text).lower().split() if text else []
-        
+            if not text or not isinstance(text, str): return []
+            # Basic fallback: lower, split, remove common punctuation but try to keep $ and numbers
+            # This fallback is less precise than NLTK path.
+            processed_tokens = []
+            # Allow specific symbols like $ and % to be part of tokens if attached to numbers
+            # This regex attempts to keep currency/percentages and words.
+            raw_tokens = re.findall(r'[\$€£¥]?\d+[.,\d]*%?|\w+', str(text).lower())
+            for token in raw_tokens:
+                # Remove standalone punctuation that might have been captured if not part of word/currency
+                if token in string.punctuation and len(token) == 1: 
+                    continue
+                processed_tokens.append(token)
+            return processed_tokens
+
         tokens = word_tokenize(text.lower())
-        lemmatized_tokens = [self.lemmatizer.lemmatize(token) for token in tokens]
+        
+        # Filter out most punctuation but keep $, %, and numbers as part of tokens if possible
+        # and ensure tokens are not just standalone punctuation.
+        # This also aims to handle cases like "$500" becoming ['$', '500'] by word_tokenize
+        # and then tries to treat them as individual items or re-combine if necessary for facts.
+        # For "all words must match", it's better if "$500" is treated as "500" and fact has "500".
+        # Or if fact has "$500", it should tokenize to ['$','500'].
+        
+        # Let's simplify: keep alphanumeric, and specific symbols if they are part of what users might consider a "word" or value.
+        # word_tokenize will separate '$' from '500'. We want to keep both if they are in the fact.
+        # The previous filter `token.isalnum()` was too aggressive, removing '$'.
+
+        cleaned_tokens = []
+        for token in tokens:
+            if token in string.punctuation: # Skip common standalone punctuation
+                continue
+            cleaned_tokens.append(token) 
+            # Numbers will be kept as strings here. Lemmatizer doesn't change them.
+            # Symbols like '$' will also be kept if word_tokenize treats them as tokens.
+
+        if not cleaned_tokens: return []
+
+        pos_tags = nltk.pos_tag(cleaned_tokens)
+        lemmatized_tokens = [self.lemmatizer.lemmatize(token, self._get_wordnet_pos(tag)) for token, tag in pos_tags]
+        
+        # print(f"    Processed '{text}' -> {lemmatized_tokens}") # Debug individual processing
         return lemmatized_tokens
 
-    def _is_sublist(self, sublist, mainlist):
-        if not sublist: return True 
-        if not mainlist: return False
-        len_sub = len(sublist)
-        for i in range(len(mainlist) - len_sub + 1):
-            if mainlist[i:i+len_sub] == sublist:
-                return True
-        return False
-
     def compute(self, llm_output: str, reference_answer: str = None, query: str = None, required_facts: str = None, **kwargs) -> float:
-        if not required_facts or not str(required_facts).strip():
-            return np.nan 
-
+        if pd.isna(required_facts) or not str(required_facts).strip(): return np.nan 
         facts_list_phrases = [fact.strip() for fact in str(required_facts).split(';') if fact.strip()]
-        if not facts_list_phrases:
-            return np.nan
-
-        if not llm_output or not llm_output.strip():
-            return 0.0 
-
+        if not facts_list_phrases: return np.nan
+        if pd.isna(llm_output) or not str(llm_output).strip(): return 0.0
+        
+        llm_output_str = str(llm_output)
         found_count = 0
 
-        if self.nltk_ready:
-            # Lemmatize the entire LLM output once and create a set of its words for efficient lookup
-            lemmatized_llm_output_words = set(self._lemmatize_text(llm_output))
-            
-            for fact_phrase in facts_list_phrases:
-                if not fact_phrase: continue # Skip empty fact phrases after split
-                
-                lemmatized_fact_phrase_words = self._lemmatize_text(fact_phrase)
-                if not lemmatized_fact_phrase_words: continue # Skip if fact phrase becomes empty after lemmatization
+        # print(f"\nDEBUG (FactAdherence): Evaluating LLM Output: '{llm_output_str}'")
+        # print(f"DEBUG (FactAdherence): Against Required Facts Input: '{required_facts}'")
 
-                # Check if all lemmatized words from the current fact phrase are present in the LLM output
-                # This is order-independent for words within the fact phrase.
-                all_fact_words_found = True
-                for fact_word in lemmatized_fact_phrase_words:
-                    if fact_word not in lemmatized_llm_output_words:
-                        all_fact_words_found = False
-                        break # No need to check other words for this fact phrase
+        if self.nltk_ready:
+            processed_llm_output_words_set = set(self._process_text_for_matching(llm_output_str))
+            # print(f"DEBUG (FactAdherence): Processed LLM Output Tokens (Set): {processed_llm_output_words_set}")
+
+            for i, fact_phrase in enumerate(facts_list_phrases):
+                if not fact_phrase: continue
                 
+                processed_fact_phrase_words = self._process_text_for_matching(fact_phrase)
+                # print(f"DEBUG (FactAdherence): Fact {i+1} ('{fact_phrase}') -> Processed Fact Tokens: {processed_fact_phrase_words}")
+                if not processed_fact_phrase_words: continue
+
+                all_fact_words_found = True
+                for fact_word in processed_fact_phrase_words:
+                    if fact_word not in processed_llm_output_words_set:
+                        all_fact_words_found = False
+                        # print(f"  Word '{fact_word}' from Fact {i+1} NOT FOUND.")
+                        break 
                 if all_fact_words_found:
                     found_count += 1
+                    # print(f"  Fact {i+1} - MATCHED.")
+                # else:
+                    # print(f"  Fact {i+1} - NO MATCH.")
         else: 
-            # Fallback: Simple case-insensitive substring check for the entire fact phrase
-            llm_output_lower = llm_output.lower()
+            # Fallback: simple case-insensitive substring for WHOLE phrase
+            # This fallback is less granular than the NLTK word-by-word check.
+            # print("DEBUG (FactAdherence): Using FALLBACK SUBSTRING CHECK.")
+            llm_output_lower = llm_output_str.lower()
             for fact_phrase in facts_list_phrases:
                 if fact_phrase.lower() in llm_output_lower:
                     found_count += 1
         
+        # print(f"DEBUG (FactAdherence): Found {found_count}/{len(facts_list_phrases)} facts.")
         return found_count / len(facts_list_phrases)
-    # def compute(self, llm_output: str, reference_answer: str = None, query: str = None, required_facts: str = None, **kwargs) -> float:
-        
-        
-        
-    #     if not required_facts or not str(required_facts).strip(): # Check if it's NaN, None, or empty string
-    #         return np.nan 
-
-    #     facts_list = [fact.strip() for fact in str(required_facts).split(';') if fact.strip()]
-    #     if not facts_list: 
-    #         return np.nan
-
-    #     if not llm_output or not llm_output.strip(): 
-    #         return 0.0 
-
-    #     found_count = 0
-    #     if self.nltk_ready:
-    #         lemmatized_llm_tokens = self._lemmatize_text(llm_output)
-                        
-    #         print(f"DEBUG: NLTK Lemmatized LLM Tokens: {lemmatized_llm_tokens}")
-
-    #         for fact_item in facts_list:
-    #             lemmatized_fact_tokens = self._lemmatize_text(fact_item)
-    #             print(f"DEBUG: NLTK Lemmatized FACT Tokens: {lemmatized_fact_tokens}")
-
-    #             if not lemmatized_fact_tokens: continue
-    #             if self._is_sublist(lemmatized_fact_tokens, lemmatized_llm_tokens):
-    #                 found_count += 1
-    #     else: 
-    #         llm_output_lower = llm_output.lower()
-    #         for fact_item in facts_list:
-    #             if fact_item.lower() in llm_output_lower:
-    #                 found_count += 1
-        
-    #     return found_count / len(facts_list)
-
-    def get_score_description(self, score: float) -> str:
-        if pd.isna(score): # Use pandas isna for checking np.nan
-            return "Not Applicable: No valid required facts were provided for this test case."
-        # ... (rest of descriptions for 1.0, 0.75, etc. as before) ...
-        if score == 1.0: return "Excellent: All required facts were found."
-        elif score >= 0.75: return "Good: Most required facts were found."
-        elif score >= 0.5: return "Moderate: Some required facts found, several missing."
-        elif score > 0.0: return "Low: Very few required facts were found."
-        return "Poor: None of the required facts were found."
-    
-
-
-
-# # llm_eval_package/metrics/fact_adherence.py
-# from llm_eval_package.metrics.base import BaseMetric
-# import numpy as np # For np.nan
-# import warnings
-
-# try:
-#     import nltk
-#     from nltk.stem import WordNetLemmatizer
-#     from nltk.tokenize import word_tokenize
-#     # Attempt to download necessary NLTK data if not found, with a flag
-#     _NLTK_AVAILABLE = True
-#     try:
-#         nltk.data.find('tokenizers/punkt')
-#         nltk.data.find('corpora/wordnet')
-#         nltk.data.find('corpora/omw-1.4') # Open Multilingual WordNet, often needed with WordNet
-#     except nltk.downloader.DownloadError:
-#         # This part is tricky in a non-interactive setup.
-#         # For now, we assume if the import works, the data *should* be there
-#         # or the user needs to download it manually as per NLTK's instructions.
-#         # A more robust solution might involve trying to download within the code,
-#         # but that can have side effects or require internet.
-#         # warnings.warn("NLTK data (punkt, wordnet, omw-1.4) not found. Fact Adherence might be less accurate or fall back. Run: nltk.download('punkt'); nltk.download('wordnet'); nltk.download('omw-1.4')")
-#         pass # Let it try, will fail gracefully in compute if tokenization/lemmatization fails
-# except ImportError:
-#     _NLTK_AVAILABLE = False
-#     warnings.warn("NLTK library not found. FactAdherenceMetric will fall back to simple substring matching and may be less accurate for morphological variations.")
-
-
-
-
-# class FactAdherenceMetric(BaseMetric):
-#     """
-#     A metric to evaluate if a list of required facts are present in the LLM output.
-#     Facts in the 'required_facts' input should be separated by semicolons (;).
-#     Uses lemmatization for more robust matching if NLTK is available.
-#     """
-
-#     def __init__(self):
-#         super().__init__("Fact Adherence")
-#         if _NLTK_AVAILABLE:
-#             print("NLTK AVAILABLE")
-#             try:
-#                 self.lemmatizer = WordNetLemmatizer()
-#                 # Test tokenization to ensure 'punkt' is truly available
-#                 word_tokenize("test") 
-                
-#                 self.nltk_ready = True
-#             except Exception as e:
-#                 warnings.warn(f"NLTK components (punkt/wordnet) for FactAdherenceMetric failed to initialize: {e}. Falling back to simple substring matching.")
-#                 self.nltk_ready = False
-
-#         else:
-#             self.nltk_ready = False
-#             print("nltk_ready NOT READY CUZ NOT AVAILABLE")
-
-#     def _lemmatize_text(self, text):
-#         if not self.nltk_ready or not text:
-#             return text.lower().split() # Fallback or simple tokenization if no lemmatization
-        
-#         tokens = word_tokenize(text.lower())
-#         # Lemmatize each word. Try to get part-of-speech for better lemmatization if possible,
-#         # but for simplicity, default to noun (WordNetLemmatizer's default if no pos).
-#         # A more advanced version could use nltk.pos_tag.
-#         lemmatized_tokens = [self.lemmatizer.lemmatize(token) for token in tokens]
-#         return lemmatized_tokens
-
-#     def _is_sublist(self, sublist, mainlist):
-#         """Checks if sublist is an ordered sublist of mainlist."""
-#         if not sublist: return True # Empty sublist is always found
-#         if not mainlist: return False # Cannot find in empty list
-        
-#         len_sub = len(sublist)
-#         for i in range(len(mainlist) - len_sub + 1):
-#             if mainlist[i:i+len_sub] == sublist:
-#                 return True
-#         return False
-
-#     def compute(self, llm_output: str, reference_answer: str = None, query: str = None, required_facts: str = None, **kwargs) -> float:
-#         if not required_facts or not required_facts.strip():
-#             return np.nan # Return NaN if no facts are required (N.A. score)
-
-#         facts_list = [fact.strip() for fact in required_facts.split(';') if fact.strip()]
-
-#         print(f"Length of facts list: {len(facts_list)}")
-
-#         if not facts_list: # After stripping, if no valid facts remain
-#             return np.nan # Return NaN if no valid facts were actually provided
-
-#         if not llm_output or not llm_output.strip(): # If LLM output is empty, it cannot contain any facts
-#             return 0.0 
-
-#         found_count = 0
-
-#         if self.nltk_ready:
-#             # print("DEBUG: Using NLTK Lemmatization for Fact Adherence") # For debugging
-#             lemmatized_llm_tokens = self._lemmatize_text(llm_output)
-            
-#             print(f"LEMMATIZED LLM TOKENS:{lemmatized_llm_tokens}")
-#             for fact_item in facts_list:
-#                 lemmatized_fact_tokens = self._lemmatize_text(fact_item)
-#                 print(f"LEMMATIZED FACT TOKENS:{lemmatized_fact_tokens}")
-#                 if not lemmatized_fact_tokens: continue # Skip empty facts after processing
-#                 if self._is_sublist(lemmatized_fact_tokens, lemmatized_llm_tokens):
-#                     found_count += 1
-
-#         else: # Fallback to simple substring checking
-#             print("DEBUG: Using simple substring check for Fact Adherence") # For debugging
-
-#             llm_output_lower = llm_output.lower()
-#             for fact_item in facts_list:
-#                 if fact_item.lower() in llm_output_lower:
-#                     found_count += 1
-        
-#         return found_count / len(facts_list)
-
-#     def get_score_description(self, score: float) -> str:
-#         if pd.isna(score): # Handle np.nan score
-#             return "Not Applicable: No valid required facts were provided for this test case."
-#         if score == 1.0:
-#             return "Excellent: All required facts were found in the LLM output."
-#         elif score >= 0.75:
-#             return "Good: Most of the required facts were found."
-#         elif score >= 0.5:
-#             return "Moderate: Some required facts were found, but several are missing."
-#         elif score > 0.0:
-#             return "Low: Very few required facts were found."
-#         else: # score == 0.0
-#             return "Poor: None of the required facts were found in the LLM output."
