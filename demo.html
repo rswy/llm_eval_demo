@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BYOB Evaluator: Interactive Guide</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Visualization & Content Choices: 
+        - Report Info: Problem vs. Solution. Goal: Compare. Method: Two-column layout with icons. Justification: Provides a high-impact, immediate understanding of the tool's value. Library: HTML/CSS.
+        - Report Info: 7-Step Workflow. Goal: Organize/Inform. Method: Clickable vertical stepper. Interaction: JS-powered show/hide for step details. Justification: Breaks a complex process into manageable, user-triggered chunks. Library: Vanilla JS.
+        - Report Info: Metric Scores & Agreement. Goal: Inform/Visualize. Method: HTML/CSS progress bars for individual scores and a Chart.js Donut chart for overall agreement. Justification: Visual representation of data is more intuitive and engaging than text alone. Library: Chart.js.
+        - Report Info: User's Role/Feedback. Goal: Inform. Method: Styled text blocks and blockquotes. Justification: Clearly communicates key messages and expectations. Library: HTML/CSS.
+    -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f7f4;
+            color: #404040;
+        }
+        .tab-active {
+            border-color: #3b82f6;
+            color: #3b82f6;
+            font-weight: 600;
+        }
+        .tab-inactive {
+            border-color: transparent;
+            color: #525252;
+        }
+        .step-active {
+            background-color: #eff6ff;
+            border-color: #3b82f6;
+            color: #2563eb;
+        }
+        .step-inactive {
+            background-color: #ffffff;
+            border-color: #e5e7eb;
+        }
+        .chart-container {
+            position: relative;
+            margin-left: auto;
+            margin-right: auto;
+            height: 280px;
+            width: 100%;
+            max-width: 280px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 320px;
+                max-width: 320px;
+            }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        
+        <header class="text-center mb-12">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-800">BYOB Evaluator</h1>
+            <p class="mt-3 text-lg text-blue-600 font-semibold">Enhancing Chatbot UAT for Banking Excellence</p>
+            <p class="mt-1 text-base text-gray-500">An Interactive Guide by Genius AI</p>
+        </header>
+
+        <main>
+            <section id="intro" class="mb-16">
+                <h2 class="text-2xl font-bold text-center text-gray-800 mb-8">From Manual Effort to Smart Automation</h2>
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                        <h3 class="text-xl font-semibold mb-4 flex items-center"><span class="text-3xl mr-3">😓</span> Current Challenges</h3>
+                        <ul class="space-y-3 text-gray-600">
+                            <li class="flex items-start"><span class="mr-2 mt-1">🕒</span> Manual test execution and tedious result comparison.</li>
+                            <li class="flex items-start"><span class="mr-2 mt-1">✍️</span> Subjectivity in scoring the quality of chatbot responses.</li>
+                            <li class="flex items-start"><span class="mr-2 mt-1">⏳</span> Excessive time spent on repetitive checks like fact presence.</li>
+                            <li class="flex items-start"><span class="mr-2 mt-1">🗓️</span> Frequent weekend work required to cover the testing scope.</li>
+                        </ul>
+                    </div>
+                    <div class="bg-blue-50 p-6 rounded-lg shadow-sm border border-blue-200">
+                        <h3 class="text-xl font-semibold mb-4 flex items-center"><span class="text-3xl mr-3">✨</span> The Evaluator Solution</h3>
+                        <ul class="space-y-3 text-blue-800">
+                            <li class="flex items-start"><span class="mr-2 mt-1">🤖</span> Automated scoring against a robust set of quality metrics.</li>
+                            <li class="flex items-start"><span class="mr-2 mt-1">📊</span> Objective, consistent, and data-driven evaluation results.</li>
+                            <li class="flex items-start"><span class="mr-2 mt-1">🎯</span> Empowers you to focus your expertise on complex cases and final judgment.</li>
+                            <li class="flex items-start"><span class="mr-2 mt-1">🚀</span> Drastically faster feedback loops for bot improvement cycles.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <div class="border-b border-gray-300 mb-8">
+                <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                    <button class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm tab-active" data-tab="workflow">The Workflow</button>
+                    <button class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm tab-inactive" data-tab="metrics">Key Metrics & Results</button>
+                    <button class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm tab-inactive" data-tab="role">Your Role & Feedback</button>
+                </nav>
+            </div>
+
+            <div id="tab-content">
+                <div id="workflow" class="tab-panel">
+                     <div class="text-center mb-8">
+                        <h2 class="text-2xl font-bold text-gray-800">Key Functionality at Your Fingertips</h2>
+                        <p class="mt-2 text-gray-600">Follow this simple, powerful workflow to evaluate your chatbot. Click each step to see the details.</p>
+                    </div>
+                    <div class="lg:grid lg:grid-cols-12 lg:gap-8">
+                        <div class="lg:col-span-4">
+                            <div id="steps-container" class="space-y-3">
+                                </div>
+                        </div>
+                        <div class="lg:col-span-8 mt-8 lg:mt-0">
+                            <div id="steps-content-container" class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 min-h-[300px]">
+                                </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="metrics" class="tab-panel hidden">
+                    <div class="text-center mb-8">
+                        <h2 class="text-2xl font-bold text-gray-800">Review, Override, and Finalize</h2>
+                        <p class="mt-2 text-gray-600">The tool provides detailed metrics, but you always have the final say. Here's how to interpret the results.</p>
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-8 items-start">
+                        <div class="space-y-6">
+                            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                                <h3 class="font-semibold text-lg mb-4">Metric Scores</h3>
+                                <p class="text-sm text-gray-600 mb-4">Each selected metric receives a score, often shown as a progress bar for quick visual assessment. The system then calculates an "Automated Overall Result" based on the logic you configure.</p>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="text-sm font-medium">Fact Adherence</label>
+                                        <div class="w-full bg-gray-200 rounded-full h-2.5 mt-1"><div class="bg-green-600 h-2.5 rounded-full" style="width: 95%"></div></div>
+                                    </div>
+                                    <div>
+                                        <label class="text-sm font-medium">Semantic Similarity</label>
+                                        <div class="w-full bg-gray-200 rounded-full h-2.5 mt-1"><div class="bg-green-600 h-2.5 rounded-full" style="width: 88%"></div></div>
+                                    </div>
+                                    <div>
+                                        <label class="text-sm font-medium">Conciseness</label>
+                                        <div class="w-full bg-gray-200 rounded-full h-2.5 mt-1"><div class="bg-red-500 h-2.5 rounded-full" style="width: 40%"></div></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                                <h3 class="font-semibold text-lg mb-2">Highlight: Fact Adherence Metric</h3>
+                                <p class="text-sm text-gray-600">This metric is now more robust.</p>
+                                <ul class="mt-3 space-y-2 text-sm list-disc list-inside text-gray-700">
+                                    <li>Handles plurals and word variations (e.g., "15 leaves" vs "15 leave").</li>
+                                    <li>Scores as "N.A." (Not Applicable) if no `required_facts` are provided for a test case, preventing skewed results.</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                             <h3 class="font-semibold text-lg mb-4 text-center">Reviewer-Evaluator Agreement</h3>
+                            <p class="text-sm text-gray-600 text-center mb-4">After finalizing your reviews, you can check how your expert judgments align with the tool's automated assessments.</p>
+                            <div class="chart-container">
+                                <canvas id="agreementChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="role" class="tab-panel hidden">
+                    <div class="text-center mb-8">
+                        <h2 class="text-2xl font-bold text-gray-800">You're in Control: Automation Supports, You Decide</h2>
+                        <p class="mt-2 text-gray-600">Your expertise is the most critical part of the process.</p>
+                    </div>
+
+                    <div class="bg-white p-8 rounded-lg shadow-sm border border-gray-200 space-y-8">
+                        <div>
+                            <h3 class="font-semibold text-lg text-gray-800">Your Expertise is Key</h3>
+                            <blockquote class="mt-2 border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 text-blue-800">
+                                The tool provides objective data; you provide the contextual understanding and final judgment. Always use the "Reviewer's Final Result" to reflect your expert assessment.
+                            </blockquote>
+                        </div>
+                        
+                        <div>
+                            <h3 class="font-semibold text-lg text-gray-800">Managing Expectations</h3>
+                            <ul class="mt-2 space-y-3 text-gray-700 list-disc list-inside">
+                                <li><span class="font-semibold">Immediate Edits:</span> Changes in data tables save instantly and trigger a page refresh. This ensures data integrity but may cause you to lose cell focus.</li>
+                                <li><span class="font-semibold">Fact Adherence Nuances:</span> While improved, very complex phrasing in `required_facts` might still need careful definition. The tool checks for the presence of the core words from your fact phrase.</li>
+                            </ul>
+                        </div>
+
+                        <div class="text-center pt-6 border-t border-gray-200">
+                            <h3 class="font-semibold text-lg text-gray-800">We Value Your Feedback Immensely!</h3>
+                            <p class="mt-2 text-gray-600">How can this tool better fit your workflow? What other features would be game-changers for you? Your insights will shape the future of this evaluator.</p>
+                            <a href="mailto:feedback-genius-ai@example.com?subject=BYOB%20Evaluator%20Feedback" class="mt-4 inline-block bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">Provide Feedback</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const tabs = document.querySelectorAll('.tab-btn');
+            const panels = document.querySelectorAll('.tab-panel');
+
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    tabs.forEach(t => t.classList.replace('tab-active', 'tab-inactive'));
+                    tab.classList.replace('tab-inactive', 'tab-active');
+
+                    panels.forEach(panel => {
+                        if (panel.id === tab.dataset.tab) {
+                            panel.classList.remove('hidden');
+                        } else {
+                            panel.classList.add('hidden');
+                        }
+                    });
+                });
+            });
+
+            const workflowData = [
+                {
+                    id: 1,
+                    icon: '📤',
+                    title: 'Prepare & Upload Data',
+                    content: `
+                        <h4 class="font-semibold text-lg mb-3">Prepare & Upload Your Test Data (CSV/JSON)</h4>
+                        <ul class="space-y-2 text-gray-600 list-disc list-inside">
+                            <li>Your file should contain columns like <strong>query</strong> and <strong>reference_answer</strong>.</li>
+                            <li><strong>New & Useful:</strong> Include an <strong>initial_reviewer_verdict</strong> column ("Pass" or "Fail") to pre-fill your final review!</li>
+                            <li>Add <strong>required_facts</strong> (semicolon-separated) for automated fact-checking.</li>
+                            <li>Use <strong>test_config</strong> to categorize tests (e.g., "Mortgage_Rates", "HR_Leave_Policy").</li>
+                            <li>You can edit data directly in the "Uploaded Data Preview" table after uploading. Changes save immediately.</li>
+                        </ul>`
+                },
+                {
+                    id: 2,
+                    icon: '🔗',
+                    title: 'Fetch Live Bot Responses',
+                    content: `
+                        <h4 class="font-semibold text-lg mb-3">Fetch Live Bot Responses (Optional)</h4>
+                        <p class="text-gray-600">If your uploaded data is missing the <strong>llm_output</strong> column, you can fetch live responses directly.</p>
+                        <ol class="mt-3 space-y-2 text-gray-600 list-decimal list-inside">
+                            <li>Select the appropriate Bot Domain from the sidebar menu.</li>
+                            <li>Click the "Fetch Responses" button in the main panel.</li>
+                            <li>A progress bar will show the status as the tool queries the bot API.</li>
+                        </ol>`
+                },
+                {
+                    id: 3,
+                    icon: '🛠️',
+                    title: 'Configure Evaluation',
+                    content: `
+                        <h4 class="font-semibold text-lg mb-3">Configure Evaluation in the Main Panel</h4>
+                        <p class="text-gray-600">Tailor the evaluation to your specific testing needs.</p>
+                        <ul class="mt-3 space-y-2 text-gray-600 list-disc list-inside">
+                            <li>Select the quality metrics you want to assess (e.g., Fact Adherence, Semantic Similarity, Conciseness).</li>
+                            <li>Define the logic for the "Automated Overall Result". For example, require "All metrics must pass".</li>
+                            <li>Adjust the default thresholds for each metric if necessary for your use case.</li>
+                        </ul>`
+                },
+                {
+                    id: 4,
+                    icon: '🚀',
+                    title: 'Run Evaluation',
+                    content: `
+                        <h4 class="font-semibold text-lg mb-3">Run the Evaluation</h4>
+                        <p class="text-gray-600">With a single click, the system gets to work.</p>
+                        <ul class="mt-3 space-y-2 text-gray-600 list-disc list-inside">
+                            <li>The evaluator processes each test case against your selected metrics and configuration.</li>
+                            <li>It calculates all scores and determines an "Automated Overall Result" for every row.</li>
+                            <li>The results are then displayed in the Detailed Results table for your review.</li>
+                        </ul>`
+                },
+                {
+                    id: 5,
+                    icon: '�',
+                    title: 'Review & Finalize',
+                    content: `
+                        <h4 class="font-semibold text-lg mb-3">Review, Override & Finalize Results</h4>
+                        <p class="text-gray-600">This is where your expertise shines. You have the final word.</p>
+                         <ul class="mt-3 space-y-2 text-gray-600 list-disc list-inside">
+                            <li>Analyze the summary charts and the detailed results table.</li>
+                            <li>The <strong>"Reviewer's Final Result"</strong> column is pre-filled from your uploaded verdict or the system's result.</li>
+                            <li>To make the final call, simply edit the dropdown in this column. Your changes are saved instantly.</li>
+                        </ul>`
+                },
+                {
+                    id: 6,
+                    icon: '⚖️',
+                    title: 'Check Agreement',
+                    content: `
+                        <h4 class="font-semibold text-lg mb-3">Check Agreement</h4>
+                        <p class="text-gray-600">See how your final verdicts align with the system's automated assessment.</p>
+                        <p class="mt-3 text-gray-600">This provides valuable insight into where the automated metrics might differ from human expert opinion, helping to refine evaluation criteria over time.</p>`
+                },
+                {
+                    id: 7,
+                    icon: '💾',
+                    title: 'Download Report',
+                    content: `
+                        <h4 class="font-semibold text-lg mb-3">Download Your Comprehensive Report</h4>
+                        <p class="text-gray-600">Once your review is complete, you can download all the data for your records.</p>
+                        <p class="mt-3 text-gray-600">The exported file includes your original data, the bot's responses, all metric scores, the automated results, and your final, expert verdicts.</p>`
+                }
+            ];
+            
+            const stepsContainer = document.getElementById('steps-container');
+            const stepsContentContainer = document.getElementById('steps-content-container');
+
+            workflowData.forEach(step => {
+                const stepButton = document.createElement('button');
+                stepButton.className = 'step-btn w-full text-left p-4 rounded-lg border flex items-center transition-colors step-inactive';
+                stepButton.dataset.stepId = step.id;
+                stepButton.innerHTML = `<span class="text-2xl mr-4">${step.icon}</span><span class="font-semibold">${step.title}</span>`;
+                stepsContainer.appendChild(stepButton);
+            });
+
+            const stepButtons = document.querySelectorAll('.step-btn');
+
+            function showStepContent(stepId) {
+                const step = workflowData.find(s => s.id == stepId);
+                stepsContentContainer.innerHTML = step.content;
+
+                stepButtons.forEach(btn => {
+                    if (btn.dataset.stepId == stepId) {
+                        btn.classList.replace('step-inactive', 'step-active');
+                    } else {
+                        btn.classList.replace('step-active', 'step-inactive');
+                    }
+                });
+            }
+
+            stepButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    showStepContent(button.dataset.stepId);
+                });
+            });
+
+            showStepContent(1);
+
+            const ctx = document.getElementById('agreementChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Agreement', 'Disagreement'],
+                    datasets: [{
+                        label: 'Agreement Rate',
+                        data: [88, 12],
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(239, 68, 68, 0.8)'
+                        ],
+                        borderColor: [
+                            '#ffffff',
+                            '#ffffff'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    size: 14,
+                                    family: 'Inter'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: ${context.raw}%`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '60%'
+                }
+            });
+
+        });
+    </script>
+
+</body>
+</html>
+�
